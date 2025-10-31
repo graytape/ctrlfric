@@ -139,19 +139,22 @@ if ($user['is_admin'] && isset($_POST['admin_action'])) {
 
 // Export data to CSV
 if (isset($_POST['export_data'])) {
-    $query = "SELECT * FROM Entries WHERE user_id = ? ORDER BY date DESC";
+    ob_clean(); // Clear any previous output buffers
+    
+    $query = "SELECT * FROM Entries WHERE user_id = ? ORDER BY date ASC";
     $stmt = $conn->prepare($query);
     $stmt->bind_param('i', $_SESSION['user_id']);
     $stmt->execute();
     $result = $stmt->get_result();
     
     header('Content-Type: text/csv');
-    header('Content-Disposition: attachment; filename="my_data_' . date('Y-m-d') . '.csv"');
+    header('Content-Disposition: attachment; filename="ctrlfric_backup_' . date('Y-m-d') . '.csv"');
     
     $output = fopen('php://output', 'w');
     fputcsv($output, ['Date', 'Type', 'Category', 'Macrocategory', 'Description', 'Out', 'In', 'Currency', 'Source', 'Note']);
     
     while ($row = $result->fetch_assoc()) {
+        if (empty($row['date'])) {continue;}
         fputcsv($output, [
             $row['date'],
             $row['type'],

@@ -28,6 +28,7 @@ In a world that feels increasingly out of control, there's something beautifully
 - Checkboxes to select and delete
 - Apply and filter also macrocategories
 - Add field for specific exhange change (fallback on general exchange rates)
+- Custom expense objectives
 - "Select last month" button
 - Filters
 - by > and < amount
