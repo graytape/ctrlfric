@@ -121,6 +121,13 @@ $stmt->bind_param('iss', $_SESSION['user_id'], $filter_start_date, $filter_end_d
 $stmt->execute();
 $category_totals = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
+// Fetch expenses categories for timespan
+$query = "SELECT macrocategory, SUM(".generateCurrencyCases().") as total FROM Entries WHERE user_id = ? AND type = 'Expense' AND date BETWEEN ? AND ? GROUP BY macrocategory ORDER BY total DESC LIMIT 10 ";
+$stmt = $conn->prepare($query);
+$stmt->bind_param('iss', $_SESSION['user_id'], $filter_start_date, $filter_end_date);
+$stmt->execute();
+$macrocategory_totals = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
 // Fetch income categories for timespan period (income by categories)
 $query = "SELECT category, SUM(".generateCurrencyCases().") as total 
           FROM Entries 
@@ -467,9 +474,15 @@ fillMissingLabels($Incomes_bycat_chartData);
                         <div class="chart">
                             <canvas id="savingsChart" style="max-height: 200px;"></canvas>
                         </div>
-                        <div class="chart-title"><?= t("Expenses by category"); ?></div>
+                        <div class="chart-title">
+                            <?= t("Expenses by macrocategory"); ?>
+                            <button id="toggleCategoryChart" style="float:right; margin-left: 10px; padding: 5px 10px; cursor: pointer;">
+                                <?= t("Macro/Micro"); ?>
+                            </button>
+                        </div>
                         <div class="chart">
                             <canvas id="categoriesChart" style="max-height: 300px;"></canvas>
+                            <canvas id="macroCategoriesChart" style="max-height: 300px; display: none;"></canvas>
                         </div>
                         <div class="chart-title"><?= t("Expenses"); ?></div>
                         <div class="chart">
@@ -612,11 +625,27 @@ fillMissingLabels($Incomes_bycat_chartData);
 
 
     <script>
+
+        // toggle micro/macro categories chart
+        document.getElementById('toggleCategoryChart').addEventListener('click', function() {
+            const categoriesChart = document.getElementById('categoriesChart');
+            const macroCategoriesChart = document.getElementById('macroCategoriesChart');
+            if (categoriesChart.style.display === 'none') {
+                categoriesChart.style.display = 'block';
+                macroCategoriesChart.style.display = 'none';
+            } else {
+                categoriesChart.style.display = 'none';
+                macroCategoriesChart.style.display = 'block';
+            }
+        });
+
+
         document.addEventListener('DOMContentLoaded', function() {
             const savingsCtx = document.getElementById('savingsChart').getContext('2d');
             const expensesDonutCtx = document.getElementById('expensesDonutChart').getContext('2d');
             const incomesDonutCtx = document.getElementById('incomesDonutChart');
             const categoriesCtx = document.getElementById('categoriesChart').getContext('2d');
+            const macroCategoriesCtx = document.getElementById('macroCategoriesChart').getContext('2d');
             const expensesByCatInTime = document.getElementById('expensesCategoryTrendsChart').getContext('2d');
             const incomesByCatInTime = document.getElementById('incomesCategoryTrendsChart').getContext('2d');
 
@@ -686,6 +715,36 @@ fillMissingLabels($Incomes_bycat_chartData);
                     datasets: [{
                         label: 'Expenses by Category',
                         data: <?= json_encode(array_column($category_totals, 'total')); ?>,
+                        backgroundColor: '#36A2EB'
+                        }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: {
+                            display: false // labels always visible (?)
+                        },
+                        datalabels: {
+                            formatter: (value, context) => {
+                                return eval(value).toLocaleString();
+                            },
+                            color: '#fff',
+                            font: {
+                                size: 10
+                            }
+                        }
+                    }
+                },
+                plugins: [ChartDataLabels]
+            });
+
+            new Chart(macroCategoriesCtx, {
+                type: 'bar',
+                data: {
+                    labels: <?= json_encode(array_column($macrocategory_totals, 'macrocategory')); ?>,
+                    datasets: [{
+                        label: 'Expenses by Macrocategory',
+                        data: <?= json_encode(array_column($macrocategory_totals, 'total')); ?>,
                         backgroundColor: '#36A2EB'
                         }]
                 },
