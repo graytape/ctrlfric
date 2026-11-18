@@ -1,147 +1,8 @@
 <?php
-require 'db.conf.php';
-
-
-$categories = [
-
-			// abitare
-			'affitto',
-			'bollette',
-			'tasse',
-			'alloggi',
-
-			// vita
-			'spostamenti',
-			'vestiti',
-			'salute',
-			'varie',
-
-			// spese
-			'cibo',
-			'cartoleria',
-			'prestiti',
-			'regali',
-			'spese casa',
-			'telefono',
-			'domini web',
-
-			// formazione
-			'cultura',
-			'svago',
-			'tecnologia',
-			'servizi',
-			'viaggi',
-			'libri',
-			'università',
-
-			// entrate
-			'saldo',
-			'lavori',
-			'rimborsi',
-			'rendite',
-			'subaffitto',
-		   	'fortuna',
-		   	'altro',
-
-			// borse di studio
-			'borsa dottorato',
-			'fondi PhD',
-			'borsa IISS',
-
-			// welfare
-			'DIS-coll'
-
-		   ];
-
-
-$macrocategories = [
-
-			'abitare',
-			'vita',
-			'spese',
-			'formazione',
-			'entrate',
-			'borse di studio',
-			'welfare'
-
-		   ];
-
-
-
-$categories = [
-
-			// abitare
-			'affitto',
-			'bollette',
-			'tasse',
-			'alloggi',
-
-			// vita
-			'spostamenti',
-			'vestiti',
-			'salute',
-			'varie',
-
-			// spese
-			'cibo',
-			'cartoleria',
-			'prestiti',
-			'regali',
-			'spese casa',
-			'telefono',
-
-			// formazione
-			'cultura',
-			'svago',
-			'tecnologia',
-			'servizi',
-			'viaggi',
-			'libri',
-			'università',
-
-			// entrate
-			'saldo',
-			'borse di studio',
-			'lavoro',
-			'rendite'
-
-		   ];
-
-
-$macrocategories = [
-
-			'abitare',
-			'vita',
-			'spese',
-			'formazione',
-			'entrate',
-			'borse di studio',
-			'welfare'
-
-		   ];
-
-$currencies = [
-		'euro' => [
-				'name'   => 'euro',
-				'symbol' => '€',
-				'code'   => 'EUR',
-		],
-		'dollars' => [
-				'name'   => 'dollars',
-				'symbol' => '$',
-				'code'   => 'USD',
-		],
-		'pounds' => [
-				'name'   => 'pounds',
-				'symbol' => '£',
-				'code'   => 'GBP',
-		],
-		'shekalim' => [
-				'name'   => 'shekel',
-				'symbol' => '₪',
-				'code'   => 'ILS',
-		],
-];
+require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/lib/finance.php';
+require_once __DIR__ . '/lib/currencies.php';
+require_once __DIR__ . '/lib/i18n.php';
 
 
 $exchange_rates = [
@@ -170,7 +31,7 @@ $exchange_rates = [
        'ILS' => 1,
    ],
 ];
-$exrate = $exchange_rates[$_SESSION['currency']??"EUR"];
+
 
 
 $default = [
@@ -181,70 +42,83 @@ $default = [
 
 
 
-// retrieve saved categories
-$query = "SELECT * FROM User_settings WHERE user_id = ?";
-$stmt = $conn->prepare($query);
-$stmt->bind_param('i', $_SESSION['user_id']);
-$stmt->execute();
-$user_settings = $stmt->get_result()->fetch_assoc();
-
-
-$categories      = !empty($user_settings['categories']) ? json_decode($user_settings['categories']) : $categories;
-$macrocategories = !empty($user_settings['macrocategories']) ? json_decode($user_settings['macrocategories']) : $macrocategories;
-$language        = $user_settings['language'] ?? "en-US";
-if (file_exists("res/$language.php")) {include "res/$language.php";}
-
-// Number Formatter
-setlocale(LC_ALL, $language.'.UTF-8');
-\Locale::setDefault($language);
-$number_formatter = new \NumberFormatter($language, \NumberFormatter::CURRENCY);
-$_SESSION['currency'] = $user_settings['currency'] ?? "EUR";
-
-
+// Resolve the language before creating default categories or repairing preferences.
+if (empty($_SESSION['user_id']) && isset($_GET['lang']) && is_string($_GET['lang']) && isset(supportedLanguages()[$_GET['lang']])) $_SESSION['ui_language']=$_GET['lang'];
+$language=normalizeLanguage($_SESSION['ui_language'] ?? $default['language']);
+$user_settings=[];
+if (!empty($_SESSION['user_id'])) {
+    $uid=(int)$_SESSION['user_id'];
+    $stmt=$conn->prepare('SELECT id FROM cf_users WHERE id=?');$stmt->bind_param('i',$uid);$stmt->execute();
+    if (!$stmt->get_result()->fetch_assoc()) {$_SESSION=[];header('Location: index.php');exit;}
+    $stmt=$conn->prepare('SELECT * FROM cf_user_settings WHERE user_id=?');$stmt->bind_param('i',$uid);$stmt->execute();
+    $user_settings=$stmt->get_result()->fetch_assoc() ?: [];
+    $language=normalizeLanguage($user_settings['language'] ?? $_SESSION['language'] ?? $language);
+    $preset=defaultCategoryConfig($language);
+    ensureUserSettings($conn,$uid,$preset['categories'],$preset['macrocategories'],$language);
+    $stmt=$conn->prepare('SELECT * FROM cf_user_settings WHERE user_id=?');$stmt->bind_param('i',$uid);$stmt->execute();
+    $user_settings=$stmt->get_result()->fetch_assoc() ?: [];
+}
+$translations=loadTranslations($language);
+$preset=defaultCategoryConfig($language);
+$categories=$preset['categories'];$macrocategories=$preset['macrocategories'];
+foreach (['categories','macrocategories'] as $key) {
+    $saved=json_decode($user_settings[$key] ?? '',true);
+    if (is_array($saved)) ${$key}=array_values(array_filter($saved,'is_string'));
+}
+$currency_catalog=currencyCatalog();
+$_SESSION['currency'] = isset($currency_catalog[$user_settings['currency'] ?? '']) ? $user_settings['currency'] : 'EUR';
+$currency_preferences=currencyPreferences($user_settings,$_SESSION['currency'],$exchange_rates);
+$currencies=array_intersect_key($currency_catalog,array_flip($currency_preferences['enabled']));
+$exrate=$currency_preferences['rates'];
+// Legacy rates remain stable for pre-1.3 movements without snapshots.
+// Extend conversion support for newly supported currencies using configured cross rates.
+foreach ($currency_catalog as $targetCode=>$unused) {
+    $exchange_rates[$targetCode] ??= [$targetCode=>1];
+    $targetRate=defaultCurrencyRate($currency_preferences,$targetCode);
+    if ($targetRate) foreach ($currency_preferences['rates'] as $sourceCode=>$sourceRate) {
+        if (!isset($exchange_rates[$targetCode][$sourceCode]) && is_numeric($sourceRate) && $sourceRate>0) $exchange_rates[$targetCode][$sourceCode]=$sourceRate/$targetRate;
+    }
+}
+$number_formatter = class_exists('NumberFormatter')
+    ? new NumberFormatter($language, NumberFormatter::CURRENCY) : new BasicCurrencyFormatter($language);
+$month_start_day = max(1, min(31, (int)($user_settings['month_start_day'] ?? 1)));
 
 function generateCurrencyCases() {
     global $exchange_rates;
-
-    $conversion_cases = [];
-    $target_currency = $_SESSION['currency'] ?? "EUR";
-    foreach ($exchange_rates[$target_currency] as $currency => $rate) {
-        $conversion[] = "WHEN '$currency' THEN amount * $rate";
+    $target = $_SESSION['currency'] ?? 'EUR';
+    $general = []; $specific = [];
+    foreach ($exchange_rates[$target] as $currency => $rate) {
+        $general[] = "WHEN '$currency' THEN amount * $rate";
+        $specific[] = "WHEN '$currency' THEN amount * exchange_rate * $rate";
     }
-	return "(CASE currency " . implode(' ', $conversion) . " END)";
-          
+    return "(CASE WHEN exchange_rate > 0 AND rate_currency IS NOT NULL THEN (CASE rate_currency ".implode(' ', $specific)." ELSE amount END) ELSE (CASE currency ".implode(' ', $general)." ELSE amount END) END)";
 }
-
 
 function formatDate($date, $format = 0) {
-	global $language;
- 
-    $fmt = new \IntlDateFormatter($language, IntlDateFormatter::FULL, IntlDateFormatter::FULL);
-	// See: https://unicode-org.github.io/icu/userguide/format_parse/datetime/#datetime-format-syntax for pattern syntax
-    switch ($format) {
-    	case '3':
-			$fmt->setPattern('dd/MM/yyyy HH:mm:s'); 
-    		//return 11/11/2024 HH:mm:ss
-    		break;
-    	case '2':
-			$fmt->setPattern('dd/MM/yyyy'); 
-    		//return 11/11/2024)
-    		break;
-    	case '1':
-			$fmt->setPattern('dd MMM yyyy'); 
-    		//return 11 Nov 2024
-    		break;
-    	case '0':
-			$fmt->setPattern('MMM yyyy'); 
-    		//return Nov 2024
-    		break;
-    	default:
-			$fmt->setPattern('MMM yyyy'); 
-    		//return Nov 2024
-    		break;
+    global $language;
+    if (!$date || str_starts_with($date, '0000-')) return '—';
+    if (preg_match('/^\d{4}-\d{2}$/', $date)) $date .= '-01';
+    try { $parsed = new DateTimeImmutable($date); } catch (Exception $e) { return '—'; }
+    if (class_exists('IntlDateFormatter')) {
+        $fmt = new IntlDateFormatter($language, IntlDateFormatter::NONE, IntlDateFormatter::NONE);
+        $fmt->setPattern([0 => 'MMM yyyy', 1 => 'dd MMM yyyy', 2 => 'dd/MM/yyyy', 3 => 'dd/MM/yyyy HH:mm:ss'][$format] ?? 'MMM yyyy');
+        return $fmt->format($parsed);
     }
-	return $fmt->format(new \DateTime($date . "-01")); 
+    $months=[
+        'en-US'=>['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+        'it-IT'=>['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'],
+        'fr-FR'=>['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'],
+        'es-ES'=>['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'],
+        'de-DE'=>['Jan.','Feb.','März','Apr.','Mai','Juni','Juli','Aug.','Sept.','Okt.','Nov.','Dez.']
+    ];
+    if ($format===2 || $format===3) return $parsed->format($format===2 ? 'd/m/Y' : 'd/m/Y H:i:s');
+    $month=$months[normalizeLanguage($language)][(int)$parsed->format('n')-1];
+    return ($format===1 ? $parsed->format('d').' ' : '').$month.' '.$parsed->format('Y');
 }
 
+function scriptJson($value): string {
+    return json_encode($value, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_INVALID_UTF8_SUBSTITUTE);
+}
 function t($key) {
     global $translations;
     return $translations[$key] ?? $key;
@@ -255,25 +129,29 @@ function floatvalue($val){
             return floatval($val);
 }
 function printMenu() {
-	echo "<div class=\"menubar\">";
-	echo "<div class=\"logo\">";
-		include 'res/logo.html';
-	echo "</div>";
-	echo "<ul>".
-			"<li><a href=\"dashboard.php\">".t('Dashboard')."</a></li>".
-			"<li><a href=\"index.php\">".t('Add')."</a></li>".
-			"<li><a href=\"import.php\">".t('Import')."</a></li>".
-			"<li><a href=\"profile.php\">".t('Profile')."</a></li>".
-			"<li><a href=\"index.php?logout=true\">".t('Logout')."</a></li>".
-		"</ul>";
-	echo "</div>";
+    echo '<div class="menubar"><a class="logo" href="dashboard.php" aria-label="Ctrl Fric">';
+    include __DIR__ . '/res/logo.html';
+    echo '</a><ul>';
+    foreach (['dashboard.php' => 'Dashboard', 'index.php' => 'Add'] as $url => $label) {
+        echo '<li><a href="'.$url.'">'.t($label).'</a></li>';
+    }
+    echo '<li><a class="menu-icon" href="profile.php" aria-label="'.t('Preferences').'" title="'.t('Preferences').'"><i class="fa-solid fa-gear" aria-hidden="true"></i></a></li>';
+    echo '<li><button class="menu-icon" type="button" id="theme-toggle" aria-label="'.t('Dark mode').'" title="'.t('Dark mode').'" aria-pressed="false"><i class="fa-solid fa-moon" aria-hidden="true"></i></button></li>';
+    echo '<li><a class="menu-icon" href="index.php?logout=true" aria-label="'.t('Logout').'" title="'.t('Logout').'"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i></a></li>';
+    echo '</ul></div>';
+}
+
+function printFooter() {
+    $version = htmlspecialchars(trim(file_get_contents(__DIR__ . '/VERSION')));
+    echo '<footer class="app-footer">Ctrl Fric · v'.$version.'<br>&lt;\\&gt; with <i class="fa-solid fa-credit-card" aria-hidden="true"></i> by <a href="https://graytape.org">graytape.org</a></footer>';
 }
 
 function fillMissingLabels(&$chartData) {
     $existingLabels = $chartData['labels'];
+    if (!$existingLabels) return;
     $completeLabels = [];
     
-    // Trova il range di date completo
+    // Find the complete date range.
     $startDate = new DateTime($existingLabels[0]??"");
     $endDate = new DateTime(end($existingLabels)??"");
     
@@ -284,7 +162,7 @@ function fillMissingLabels(&$chartData) {
     
     $chartData['labels'] = $completeLabels;
     
-    // Riempie i dataset con valori zero per le etichette mancanti
+    // Fill datasets with zeros for missing labels.
     foreach ($chartData['datasets'] as &$dataset) {
         $filledData = array_fill(0, count($completeLabels), 0);
         

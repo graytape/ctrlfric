@@ -113,4 +113,43 @@ $translations = [
 ];
 
 
-?>
+
+
+$translations['Manage currencies']='Gestisci valute';
+
+$translations=array_merge($translations,[
+'Advanced search'=>'Ricerca avanzata',
+'Last month'=>'Mese scorso',
+'1 week'=>'1 settimana',
+'1 month'=>'1 mese',
+'6 months'=>'6 mesi',
+'1 year'=>'1 anno',
+'All'=>'Tutte',
+'Type'=>'Tipo',
+'Amount greater than'=>'Importo maggiore di',
+'Amount less than'=>'Importo minore di',
+'Compare amounts in'=>'Confronta importi in',
+'Original currency'=>'Valuta originale',
+'Sort'=>'Ordina',
+'Newest first'=>'Prima i più recenti',
+'Oldest first'=>'Prima i più vecchi',
+'Largest amount first'=>'Prima gli importi maggiori',
+'Smallest amount first'=>'Prima gli importi minori',
+'Only entries with notes'=>'Solo movimenti con note',
+'Filters apply to the transaction list.'=>'I filtri si applicano all’elenco dei movimenti.',
+'Select entries'=>'Seleziona movimenti',
+'Select all'=>'Seleziona tutte',
+'Clear selection'=>'Annulla selezione',
+'Export selected CSV'=>'Esporta selezione CSV',
+'Change category'=>'Cambia categoria',
+'Change macrocategory'=>'Cambia macrocategoria',
+'Change type'=>'Cambia entrata/uscita',
+'New value'=>'Nuovo valore',
+'Selected'=>'selezionate',
+'Delete selected entries?'=>'Eliminare i movimenti selezionati?',
+'Select between 1 and 1000 entries.'=>'Seleziona da 1 a 1000 movimenti.',
+'Invalid selection.'=>'Selezione non valida.',
+'Invalid amount range.'=>'Intervallo di importi non valido.'
+]);
+
+$translations['No results found']='Nessun risultato';

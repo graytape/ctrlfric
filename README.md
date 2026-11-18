@@ -19,10 +19,19 @@ In a world that feels increasingly out of control, there's something beautifully
 - **Profile Management**: Customize your categories and personal settings
 - **Data Export**: Download your financial data for external analysis
 
-### Installation 
+### Installation
 
-- Configure your database access in db.conf.example.php and rename it to db.conf.php
-- The firstr egistered user will be the admin
+- Import `schema.sql` into your MySQL or MariaDB database
+- Configure your database access in `db.conf.example.php` and rename it to `db.conf.php`
+- The first registered user will be the admin
 
+### Migration
 
+Back up your database, replace the application files while keeping `db.conf.php`, then open `migrate.php` in your browser and sign in as an administrator. The migration preserves existing data and can be run again safely.
 
+### Changelog
+
+- **1.5.3**: English source comments, migration page and concise README
+- **1.5.2**: Compact search aligned with the date filters
+- **1.5.1**: Checkboxes before dates and full-width advanced filters
+- **1.5.0**: Advanced search, bulk actions and editable automatic exchange rates

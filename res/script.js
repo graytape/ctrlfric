@@ -1,7 +1,25 @@
+function convertEntryAmount(amount, currency, rate, rateCurrency, target, rates) {
+    if (Number(rate) > 0 && rates[target][rateCurrency] !== undefined) return amount * Number(rate) * rates[target][rateCurrency];
+    return amount * (rates[target][currency] ?? 1);
+}
 
 // Inline editing
 function enableEditing(row) {
     row.classList.add('editing');
+    if (!row.querySelector('.specific-rate')) {
+        const cell = row.querySelector('.amount').parentElement;
+        const wrapper = document.createElement('div'); wrapper.className = 'edit-value entry-rate-edit';
+        const input = document.createElement('input');
+        Object.assign(input, {type:'number',step:'any',min:'0.0000000001',max:'9999999999',className:'specific-rate',value:row.dataset.exchangeRate || '',placeholder:t['Optional'] || 'Optional'});
+        input.setAttribute('aria-label',t['Exchange rate'] || 'Exchange rate');
+        const target = document.createElement('select'); target.className = 'rate-currency';
+        Object.keys(exchange_rates).forEach(code => {const option = new Option(code,code); option.selected = code === (row.dataset.rateCurrency || main_currency); target.add(option);});
+        const hint = document.createElement('small');
+        const update = () => {hint.textContent = `1 ${row.querySelector('.currency').value} = ${input.value || (exchange_rates[target.value][row.querySelector('.currency').value])} ${target.value}`;};
+        wrapper.append(input,target,hint); cell.append(wrapper);
+        input.addEventListener('input',update); target.addEventListener('change',update); row.querySelector('.currency').addEventListener('change',update); update();
+    }
+
     row.querySelectorAll('.display-value').forEach(el => el.classList.add('hidden'));
     row.querySelectorAll('.edit-value').forEach(el => el.classList.remove('hidden'));
     row.querySelectorAll('.edit-btn, .delete-btn').forEach(el => el.classList.add('hidden'));
@@ -25,42 +43,31 @@ function saveChanges(row) {
     const macrocategory = row.querySelector('.macrocategory').value;
     const source        = row.querySelector('.source').value;
     const note          = row.querySelector('.note').value;
+    const exchange_rate = row.querySelector('.specific-rate').value;
+    const rate_currency = row.querySelector('.rate-currency').value;
 
     fetch('get_data.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: `action=update&id=${id}&type=${type}&date=${date}&description=${description}&amount=${amount}&currency=${currency}&category=${category}&macrocategory=${macrocategory}&source=${source}&note=${note}`
+        body: new URLSearchParams({action: 'update', id, type, date, description, amount, currency, category, macrocategory, source, note, exchange_rate, rate_currency})
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            row.querySelector('td:first-child .display-value').textContent               = formatDate(date);
-            row.querySelector('td:nth-child(2) .display-value:first-child').textContent  = category;
-            row.querySelector('td:nth-child(2) .display-value:nth-child(2)').textContent = macrocategory;
-            row.querySelector('td:nth-child(3) .display-value:first-child').textContent  = description;
-            row.querySelector('td:nth-child(3) .display-value:nth-child(3)').innerHTML   = note ? `<i class="fa fa-info-circle info-note" title="${note}""></i>` : ``;
-            if (type == 'Income') {
-                row.querySelector('td:nth-child(4) .display-value').textContent = `${'+'}${Number(parseFloat(amount)).toLocaleString(language, {style:"currency", currency:currency})}`;
-                row.querySelector('td:nth-child(4) .display-value').setAttribute('data-currency', currency);
-            } else {
-                row.querySelector('td:nth-child(5) .display-value').textContent = `${'-'}${Number(parseFloat(amount)).toLocaleString(language, {style:"currency", currency:currency})}`;
-                row.querySelector('td:nth-child(5) .display-value').setAttribute('data-currency', currency);
-            }
-            disableEditing(row);
-            calculateTotalForTable();
+            location.reload();
         } else {
-            alert('Failed to save changes');
+            alert(t['Failed to save changes']);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Failed to save changes');
+        alert(t['Failed to save changes']);
     });
 }
 function deleteRow(row) {
-    if (!confirm('Are you sure you want to delete this entry?')) {
+    if (!confirm(t['Are you sure you want to delete this entry?'])) {
         return;
     }
 
@@ -77,22 +84,24 @@ function deleteRow(row) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            const tbody = row.closest('tbody');
             row.remove();
+            tbody.dataset.offset = Math.max(0, (Number(tbody.dataset.offset) || 0) - 1);
             calculateTotalForTable();
         } else {
-            alert('Failed to delete entry');
+            alert(t['Failed to delete entry']);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Failed to delete entry');
+        alert(t['Failed to delete entry']);
     });
 }
 
 
 // Helper function to escape HTML
 function escapeHtml(unsafe) {
-    return unsafe
+    return String(unsafe ?? '')
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
@@ -101,7 +110,7 @@ function escapeHtml(unsafe) {
 }
 // Helper function to format dates
 function formatDate(dateString) {
-    const date = new Date(dateString);
+    const date = new Date(dateString + 'T12:00:00');
     return date.toLocaleDateString();
 }
 
@@ -129,20 +138,20 @@ function calculateTotalForTable() {
         // Calculate incomes
         const incomeCell = row.querySelector('td.income-amount .display-value:not(.hidden)');
         if (incomeCell) {
-            const incAmount = parseFloat(incomeCell.textContent.replace(/[^0-9,-]+/g, '').replace(/[,]+/g, '.'));
+            const incAmount = Math.abs(Number(row.dataset.amount));
             const currency = incomeCell.dataset.currency;
             if (!isNaN(incAmount)) {
-                totalIncome += (incAmount * exchange_rates[main_currency][currency]);
+                totalIncome += (convertEntryAmount(incAmount, currency, row.dataset.exchangeRate, row.dataset.rateCurrency, main_currency, exchange_rates));
             }
         }
 
         // Calculate expenses
         const expenseCell = row.querySelector('td.expense-amount .display-value:not(.hidden)');
         if (expenseCell) {
-            const expAmount = parseFloat(expenseCell.textContent.replace(/[^0-9,-]+/g, '').replace(/[,]+/g, '.'));
+            const expAmount = Math.abs(Number(row.dataset.amount));
             const currency = expenseCell.dataset.currency;
             if (!isNaN(expAmount)) {
-                totalExpense += (expAmount * exchange_rates[main_currency][currency]);
+                totalExpense += (convertEntryAmount(expAmount, currency, row.dataset.exchangeRate, row.dataset.rateCurrency, main_currency, exchange_rates));
             }
         }
     });
@@ -163,104 +172,20 @@ function calculateTotalForTable() {
 
 
 const limit = 10;
-function loadMoreTransactions() {
-    const startDate = document.getElementById('start_date').value;
-    const endDate = document.getElementById('end_date').value;
-    const button = document.getElementById('load-more-entries');
-    
-    button.disabled = true;
-    button.textContent = t["Loading..."];
-
-    const tbody = document.querySelector('.transactions-table');
-    const currentOffset = parseInt(tbody.dataset.offset) || 0;
-
-    fetch(`get_data.php?offset=${currentOffset}&limit=10&start_date=${startDate}&end_date=${endDate}`)
-        .then(response => response.json())
-        .then(data => {
-            data.transactions.forEach(transaction => {
-                const row = document.createElement('tr');
-                row.dataset.id = transaction.id;
-                row.dataset.type = transaction.type;
-                transaction.amount_val = transaction.amount;
-                transaction.amount = Number(transaction.amount).toLocaleString();
-                const isExpense = transaction.type === 'Expense';
-
-                var selectCurrency = `<select class="edit-value hidden currency">`;
-                for (const key in currencies) {
-                    if (currencies.hasOwnProperty(key)) {
-                        const currency = currencies[key];
-                        selectCurrency += `<option value="`+currency.code+`" `+(transaction.currency==currency.code?`selected`:``)+`>`+currency.code+`</option>`;
-                    }
-                }
-                selectCurrency += `</select>`;
-
-                
-                const amountDisplay = isExpense
-                    ? `<td></td><td class="expense-amount"><span class="display-value negative" data-currency="${transaction.currency}">-${transaction.amount}</span>
-                       <input type="number" step="0.01" class="edit-value hidden amount" value="${transaction.amount_val}">${selectCurrency}</td>`
-
-                    : `<td class="income-amount"><span class="display-value positive" data-currency="${transaction.currency}">+${transaction.amount}</span>
-                       <input type="number" step="0.01" class="edit-value hidden amount" value="${transaction.amount_val}">${selectCurrency}</td><td></td>`;
-
-                row.innerHTML = `
-                    <td>
-                        <span class="display-value">${formatDate(transaction.date)}</span>
-                        <input type="date" class="edit-value hidden date" value="${transaction.date}">
-                       <input type="text" class="edit-value hidden source" value="${escapeHtml(transaction.source || '')}" placeholder="source">
-                    </td>
-                    <td>
-                        <span class="display-value tag-category">${transaction.category}</span>
-                        <span class="display-value tag-macrocategory">${transaction.macrocategory}</span>
-                        <select class="edit-value hidden category" value="${escapeHtml(transaction.category)}">
-                            ${categories.map(cat => `
-                                <option value="${escapeHtml(cat)}" ${cat === transaction.category ? 'selected' : ''}>
-                                    ${escapeHtml(cat)}
-                                </option>
-                            `).join('')}
-                        </select>
-                        <select class="edit-value hidden macrocategory" value="${escapeHtml(transaction.macrocategory)}">
-                            ${macrocategories.map(macrocat => `
-                                <option value="${escapeHtml(macrocat)}" ${macrocat === transaction.macrocategory ? 'selected' : ''}>
-                                    ${escapeHtml(macrocat)}
-                                </option>
-                            `).join('')}
-                        </select>
-                    </td>
-                    <td>
-                        <span class="display-value">${escapeHtml(transaction.description)}</span>
-                        <input type="text" class="edit-value hidden description" value="${escapeHtml(transaction.description)}" placeholder="description">
-                        <span class="display-value">` + (transaction.note?`<i class="fa fa-info-circle info-note" title="${transaction.note}"></i>`:``) + `</span>
-                        <input type="text" class="edit-value hidden note" value="${escapeHtml(transaction.note || '')}" placeholder="note">
-                    </td>
-                    ${amountDisplay}
-                    <td class="actions">
-                        <button class="edit-btn" title="Edit"><i class="fa fa-edit"></i></button>
-                        <button class="delete-btn" title="Delete"><i class="fa fa-trash"></i></button>
-                        <button class="save-btn hidden" title="Save"><i class="fa fa-check"></i></button>
-                        <button class="cancel-btn hidden" title="Cancel"><i class="fa fa-times"></i></button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-
-            button.disabled = false;
-            button.textContent = t["Load More"];
-            
-            if (!data.hasMore) {
-                button.style.display = 'none';
-            }
-            
-            tbody.dataset.offset = currentOffset + data.transactions.length;
-            calculateTotalForTable(); 
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            button.disabled = false;
-            button.textContent = t["Load More"];
-        });
+async function loadMoreTransactions() {
+    const button=document.getElementById('load-more-entries'),tbody=document.querySelector('.transactions-table');
+    button.disabled=true;button.textContent=t['Loading...'];
+    try {
+        const params=new URLSearchParams(entryFilters);params.set('offset',tbody.dataset.offset||'0');params.set('limit','10');
+        const response=await fetch('get_data.php?'+params);const data=await response.json();if(!response.ok)throw Error(data.error);
+        data.transactions.forEach(entry=>tbody.appendChild(window.createTransactionRow(entry)));
+        tbody.dataset.offset=Number(tbody.dataset.offset||0)+data.transactions.length;
+        button.hidden=!data.hasMore;calculateTotalForTable();
+    } catch(e){alert(e.message||t['Error']);}
+    finally{button.disabled=false;button.textContent=t['Load More'];}
 }
 
-// Attiva le funzioni al caricamento della pagina
+// Initialize functions when the page loads.
 document.addEventListener('DOMContentLoaded', () => {
     calculateTotalForTable();
 });
@@ -283,75 +208,16 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Add event listeners
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded',()=>{
     calculateTotalForTable();
-    
-    const loadMoreButton = document.getElementById('load-more-entries');
-    if (loadMoreButton) {
-        loadMoreButton.addEventListener('click', loadMoreTransactions);
-    }
-});
-
-document.addEventListener('DOMContentLoaded', function() {
-    const searchInput  = document.getElementById('searchInput');
-    const searchButton = document.getElementById('searchButton');
-    const tbody        = document.querySelector('.transactions-table.tbody');
-    const startDate    = document.getElementById('start_date');
-    const endDate      = document.getElementById('end_date');
-
-    // Client-side filtering
-    searchInput.addEventListener('input', function(e) {
-        const searchText = e.target.value.toLowerCase();
-        
-        // Only filter if we have 3 or more characters
-        if (searchText.length >= 3) {
-            const rows = tbody.getElementsByTagName('tr');
-            
-            Array.from(rows).forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(searchText) ? '' : 'none';
-            });
-        } else {
-            // Show all rows if search text is less than 3 characters
-            const rows = tbody.getElementsByTagName('tr');
-            Array.from(rows).forEach(row => {
-                row.style.display = '';
-            });
-        }
-        calculateTotalForTable();
-    });
-
-    // Server-side search
-    searchButton.addEventListener('click', function() {
-        const searchText = searchInput.value;
-        if (searchText.length < 3) {
-            alert('Please enter at least 3 characters to search');
-            return;
-        }
-
-        fetch(`get_data.php?action=search&query=${encodeURIComponent(searchText)}&start_date=${startDate.value}&end_date=${endDate.value}`)
-            .then(response => response.json())
-            .then(data => {
-                // Clear existing rows
-                tbody.innerHTML = '';
-                
-                // Add new rows
-                data.transactions.forEach(entry => {
-                    const row = createTransactionRow(entry);
-                    tbody.appendChild(row);
-                });
-                calculateTotalForTable();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
-    });
-
+    document.getElementById('load-more-entries')?.addEventListener('click',loadMoreTransactions);
     // Helper function to create a transaction row
     function createTransactionRow(entry) {
         const row = document.createElement('tr');
         row.dataset.id = entry.id;
+        row.dataset.amount = entry.amount;
+        row.dataset.exchangeRate = entry.exchange_rate || '';
+        row.dataset.rateCurrency = entry.rate_currency || '';
         row.dataset.type = entry.type;
 
         entry.amount_val = entry.amount;
@@ -371,23 +237,23 @@ document.addEventListener('DOMContentLoaded', function() {
             <td>
                 <span class="display-value">${formatDate(entry.date)}</span>
                 <input type="date" class="edit-value hidden date" value="${entry.date}">
-                <input type="text" class="edit-value hidden source" value="${entry.source || ''}" placeholder="source">
+                <input type="text" class="edit-value hidden source" value="${escapeHtml(entry.source || '')}" placeholder="${escapeHtml(t['Source'])}">
             </td>
             <td>
-                <span class="display-value tag-category">${entry.category}</span>
-                <span class="display-value tag-macrocategory">${entry.macrocategory}</span>
+                <span class="display-value tag-category">${escapeHtml(entry.category)}</span>
+                <span class="display-value tag-macrocategory">${escapeHtml(entry.macrocategory)}</span>
                 <select class="edit-value hidden category">
-                    ${categories.map(cat => `<option value="${cat}" ${cat === entry.category ? 'selected' : ''}>${cat}</option>`).join('')}
+                    ${categories.map(cat => `<option value="${escapeHtml(cat)}" ${cat === entry.category ? 'selected' : ''}>${escapeHtml(cat)}</option>`).join('')}
                 </select>
                 <select class="edit-value hidden macrocategory">
-                    ${macrocategories.map(macrocat => `<option value="${macrocat}" ${macrocat === entry.macrocategory ? 'selected' : ''}>${macrocat}</option>`).join('')}
+                    ${macrocategories.map(macrocat => `<option value="${escapeHtml(macrocat)}" ${macrocat === entry.macrocategory ? 'selected' : ''}>${escapeHtml(macrocat)}</option>`).join('')}
                 </select>
             </td>
             <td>
-                <span class="display-value">${entry.description}</span>
-                <input type="text" class="edit-value hidden description" value="${entry.description}" placeholder="description">
-                <span class="display-value">` + (entry.note?`<i class="fa fa-info-circle info-note" title="${entry.note}"></i>`:``) + `</span>
-                <input type="text" class="edit-value hidden note" value="${entry.note || ''}" placeholder="note">
+                <span class="display-value">${escapeHtml(entry.description)}</span>
+                <input type="text" class="edit-value hidden description" value="${escapeHtml(entry.description)}" placeholder="${escapeHtml(t['Description'])}">
+                <span class="display-value">` + (entry.note?`<i class="fa-solid fa-circle-info info-note" title="${escapeHtml(entry.note)}"></i>`:``) + `</span>
+                <input type="text" class="edit-value hidden note" value="${escapeHtml(entry.note || '')}" placeholder="${escapeHtml(t['Note'])}">
             </td>
             ${entry.type === 'Expense' ? 
                 `<td></td><td class="expense-amount">
@@ -402,19 +268,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 </td><td></td>`
             }
             <td class="actions">
-                <button class="edit-btn" title="Edit"><i class="fa fa-edit"></i></button>
-                <button class="delete-btn" title="Delete"><i class="fa fa-trash"></i></button>
-                <button class="save-btn hidden" title="Save"><i class="fa fa-check"></i></button>
-                <button class="cancel-btn hidden" title="Cancel"><i class="fa fa-times"></i></button>
+                <button class="edit-btn" title="${escapeHtml(t['Edit'])}"><i class="fa-solid fa-pen-to-square"></i></button>
+                <button class="delete-btn" title="${escapeHtml(t['Delete'])}"><i class="fa-solid fa-trash"></i></button>
+                <button class="save-btn hidden" title="${escapeHtml(t['Save'])}"><i class="fa-solid fa-check"></i></button>
+                <button class="cancel-btn hidden" title="${escapeHtml(t['Cancel'])}"><i class="fa-solid fa-xmark"></i></button>
             </td>
         `;
         
         return row;
     }
 
+    window.createTransactionRow=createTransactionRow;
+
     // Helper function to format date
     function formatDate(dateString) {
-        const date = new Date(dateString);
+        const date = new Date(dateString + 'T12:00:00');
         return date.toLocaleDateString();
     }
 });
+// Native links make category navigation work with touch and keyboard alike.
+if (document.body.dataset.categoryFilter === '1') {
+    const enhanceTags = () => document.querySelectorAll('.transactions-table .tag-category').forEach(tag => {
+        const params = new URLSearchParams({category: tag.textContent, all_dates: '1'});
+        if (tag.tagName === 'A') {
+            tag.href = 'dashboard.php?' + params;
+            return;
+        }
+        const link = document.createElement('a');
+        link.className = tag.className;
+        link.textContent = tag.textContent;
+        link.href = 'dashboard.php?' + params;
+        tag.replaceWith(link);
+    });
+    enhanceTags();
+    const table = document.querySelector('.transactions-table');
+    if (table) new MutationObserver(enhanceTags).observe(table, {childList:true, subtree:true});
+}

@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 519" width="400" height="519">
+<title>Starry Night — stylized night sky, cypress and village</title>
+<g fill="none" stroke="#354860" stroke-linecap="round" stroke-linejoin="round">
+<!-- Broad, flowing sky and a central spiral. -->
+<g stroke-width="5">
+<path d="M-20 165C60 111 86 128 159 153S276 192 300 143 245 90 222 110s-8 49 17 46 26-24 9-27"/>
+<path d="M-20 182C58 128 91 145 161 169S292 212 318 153 254 64 218 90s-21 79 23 83 56-42 24-60"/>
+<path d="M-10 201C54 156 84 157 148 184s162 54 188-18  -70-121-120-91"/>
+<path d="M17 223C86 184 104 205 180 226s138 5 169-26 48-36 71-32"/>
+<path d="M-12 245C64 210 111 231 171 244s151 14 189-21 41-32 61-28"/>
+<path d="M119 110C143 95 166 100 188 112M124 91C149 80 171 83 188 94M150 68c27-8 47-6 66 2"/>
+<path d="M-6 32C48 14 68 23 89 39M-10 49C35 32 60 38 76 48M284 39c41-19 79-11 119 3M299 58c43-9 71-5 105 8"/>
+</g>
+<!-- Radiant stars: imperfect circular strokes echo painted halos. -->
+<g stroke-width="3">
+<ellipse cx="49" cy="87" rx="23" ry="21"/><ellipse cx="49" cy="87" rx="14" ry="13"/>
+<ellipse cx="147" cy="37" rx="20" ry="19"/><ellipse cx="147" cy="37" rx="11" ry="10"/>
+<ellipse cx="355" cy="119" rx="22" ry="24"/><ellipse cx="355" cy="119" rx="13" ry="15"/>
+<ellipse cx="364" cy="278" rx="19" ry="17"/><ellipse cx="364" cy="278" rx="10" ry="9"/>
+<ellipse cx="192" cy="278" rx="16" ry="15"/><ellipse cx="192" cy="278" rx="8" ry="7"/>
+<ellipse cx="93" cy="268" rx="19" ry="17"/>
+</g>
+<g fill="#354860" stroke="none"><circle cx="49" cy="87" r="7"/><circle cx="147" cy="37" r="5"/><circle cx="355" cy="119" r="7"/><circle cx="364" cy="278" r="5"/><circle cx="192" cy="278" r="4"/><circle cx="93" cy="268" r="8"/>
+<path d="M275 29c-33 7-41 39-23 58 17 17 42 10 52-7-29 8-51-20-29-51z"/>
+</g>
+<g stroke-width="3"><path d="M280 15c-44-1-68 48-37 79 21 23 52 17 70-6M282 5c-58-1-85 62-47 98 26 24 61 18 85-9"/></g>
+<!-- Layered hills above a quiet, angular village. -->
+<g stroke-width="4"><path d="M0 355c60-35 91-33 137-26s62-31 105-20 91 11 169-21"/><path d="M0 370c59-39 98-22 138-24s67-29 103-18 97 5 170-23"/><path d="M1 387c59-34 100-26 145-22s68-30 108-21 92 5 157-17"/></g>
+<g stroke-width="3"><path d="M135 438v-33l20-19 22 19v33m-44-31h45m-33 31v-19h16v19M187 443v-42l23-22 22 22v43m-46-41h48m-36 38v-20h14v20M275 430v-40l25-20 25 20v40m-53-39h56m-45 21h10v-12h-10m21 12h10v-12h-10M330 453v-37l25-20 22 20v37m-48-35h50m-33 34v-19h12v19"/>
+<path d="M235 462v-67h9v-59l10-38 10 38v59h9v67m-29-124h20m-29 57h38m-24 67v-26h10v26M129 462c44-14 59-10 87 5m67-15c34 2 57 20 105 4M123 482c89-14 154-4 188 12s66 9 97-3"/></g>
+<!-- Tall flame-shaped cypress in the foreground. -->
+<path fill="#354860" stroke="none" d="M22 519c11-26-5-41 4-65s-5-44 7-69-5-56 8-77 4-46 15-72 3-60 14-88c-1 55 21 64 16 99 20 20 10 44 22 62-5 31 25 47 16 73 18 31 0 50 15 82 9 20 0 39 8 55z"/>
+<g stroke="#151c26" stroke-width="3"><path d="M68 211c-7 54 16 56 5 100s18 66 4 105 11 73 5 103M52 321c-14 40 9 55-4 88s11 61 1 100M95 342c-6 37 19 38 10 79s18 58 6 88"/></g>
+</g></svg>

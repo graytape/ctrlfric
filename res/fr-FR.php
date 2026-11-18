@@ -108,4 +108,42 @@ $translations = [
 'Reset Password'               => 'Réinitialiser le mot de passe',
 'Delete User'                  => 'Supprimer l\'utilisateur',
 ];
-?>
+
+$translations['Manage currencies']='Gérer les devises';
+
+$translations=array_merge($translations,[
+'Advanced search'=>'Recherche avancée',
+'Last month'=>'Mois dernier',
+'1 week'=>'1 semaine',
+'1 month'=>'1 mois',
+'6 months'=>'6 mois',
+'1 year'=>'1 an',
+'All'=>'Toutes',
+'Type'=>'Type',
+'Amount greater than'=>'Montant supérieur à',
+'Amount less than'=>'Montant inférieur à',
+'Compare amounts in'=>'Comparer les montants en',
+'Original currency'=>'Devise d’origine',
+'Sort'=>'Trier',
+'Newest first'=>'Plus récents d’abord',
+'Oldest first'=>'Plus anciens d’abord',
+'Largest amount first'=>'Montants les plus élevés d’abord',
+'Smallest amount first'=>'Montants les plus faibles d’abord',
+'Only entries with notes'=>'Uniquement les opérations avec notes',
+'Filters apply to the transaction list.'=>'Les filtres s’appliquent à la liste des opérations.',
+'Select entries'=>'Sélectionner des opérations',
+'Select all'=>'Tout sélectionner',
+'Clear selection'=>'Effacer la sélection',
+'Export selected CSV'=>'Exporter la sélection en CSV',
+'Change category'=>'Changer de catégorie',
+'Change macrocategory'=>'Changer de macrocatégorie',
+'Change type'=>'Changer revenu/dépense',
+'New value'=>'Nouvelle valeur',
+'Selected'=>'sélectionnées',
+'Delete selected entries?'=>'Supprimer les opérations sélectionnées ?',
+'Select between 1 and 1000 entries.'=>'Sélectionnez de 1 à 1000 opérations.',
+'Invalid selection.'=>'Sélection invalide.',
+'Invalid amount range.'=>'Plage de montants invalide.'
+]);
+
+$translations['No results found']='Aucun résultat';
